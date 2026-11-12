@@ -1,37 +1,35 @@
 #include <Wire.h>
 
 // pines
+const int PIN_EMISOR_IR = 7;    
+const int PIN_RECEPTOR_IR = A0; 
 const int PIN_ROJO = 8;
 const int PIN_VERDE = 9;
+const int PIN_AZUL = 10;
 const int PIN_BOTON = 2;
 const int PIN_BUZZER = 4;
-const int MPU_addr = 0x68; 
+const int MPU = 0x68; 
 
-const unsigned long T_CAE = 5000;       // ms inclinado antes de considerar que cayó
-const unsigned long T_RECARGA = 10000;  // ms de gracia para recargar la bolsa
-
+const unsigned long T_CAE = 5000;       // ms inclinado antes de considerar que cayo
+const unsigned long T_RECARGA = 10000;  // ms para recargar la bolsa antes de alarma
 const float UMBRAL_INCLINACION = 30.0;  // grados de inclinación para considerarlo inclinado
 
 enum Estado { IDLE, PRE_ALARMA, ALARMA_CAIDO, ALARMA_VACIO };
 Estado estado = IDLE;
 const char* NOMBRES[] = {"IDLE", "PRE_ALARMA", "ALARMA_CAIDO", "ALARMA_VACIO"};
 
-unsigned long tEstado = 0;        
+unsigned long tEstado = 0;       // indica tiempo en el estado actual    
+bool inclinado = false;          // indica si el sistema esta inclinado o no 
+bool vacia = false;              // indica si la bolsa esta vacia o no 
+bool inclinadoIgnorado = false;  // indica si se apreto el boton durante una inclinacion  
+bool vacioReconocido = false;    // indica si se apreto el boton durante una bolsa vacia
+unsigned long tReconocido = 0;   // indica tiempo en el q se reconcocio la bolsa vacia
+bool botonLectura = HIGH;        // indica ultima lectura del pin del boton
+bool botonEstable = HIGH;        // indica estado del boton ya confirmado desp de 30 ms sin cambiar
+unsigned long tCambioBoton = 0;  // indica el tiempo del ultimo cambio de la lectura del boton
+int tonoActual = 0;              // indica el tono actual del buzzer
 
-bool inclinado = false;           
-bool vacia = false;               
-
-bool inclinadoIgnorado = false;   
-bool vacioReconocido = false;    
-unsigned long tReconocido = 0;    
-
-bool botonLectura = HIGH;
-bool botonEstable = HIGH;
-unsigned long tCambioBoton = 0;
-
-int tonoActual = 0;               
-
-bool botonApretado() {
+bool botonApretado() { // antirrebote, solo acepta un cambio si la lectura se mantuvo estable más de 30 ms, y devuelve true únicamente en el flanco de bajada
   bool lectura = digitalRead(PIN_BOTON);
   if (lectura != botonLectura) {                
     botonLectura = lectura;
@@ -44,25 +42,31 @@ bool botonApretado() {
   return false;
 }
 
-void leerSensorInclinacion() {
-  Wire.beginTransmission(MPU_addr);
-  Wire.write(0x3B); 
+void setColor(bool r, bool g, bool b) {
+  digitalWrite(PIN_R, r ? HIGH : LOW);   
+  digitalWrite(PIN_G, g ? HIGH : LOW);   
+  digitalWrite(PIN_B, b ? HIGH : LOW);   
+}
+
+void leerSensorInclinacion() { // toma valores del MPU y actualiza la variable inclinado segun corresponda
+  Wire.beginTransmission(MPU);
+  Wire.write(0x3B);                                       
   Wire.endTransmission(false);
-  Wire.requestFrom(MPU_addr, 6, true);
+  Wire.requestFrom(MPU, 6, true); // pide 6 bytes (2 por eje) para escribir
 
   if (Wire.available() >= 6) {
-    int16_t ax = (Wire.read() << 8 | Wire.read());
+    int16_t ax = (Wire.read() << 8 | Wire.read()); 
     int16_t ay = (Wire.read() << 8 | Wire.read());
     int16_t az = (Wire.read() << 8 | Wire.read());
 
-    float gX = (float)ax / 16384.0;
+    float gX = (float)ax / 16384.0; // se dividen por 16384 para pasarlos a gravedad
     float gY = (float)ay / 16384.0;
     float gZ = (float)az / 16384.0;
 
-    float anguloX = atan2(gX, sqrt(gY * gY + gZ * gZ)) * 180.0 / PI;
+    float anguloX = atan2(gX, sqrt(gY * gY + gZ * gZ)) * 180.0 / PI; // calculo el angulo
     float anguloY = atan2(gY, sqrt(gX * gX + gZ * gZ)) * 180.0 / PI;
 
-    if (abs(anguloX) > UMBRAL_INCLINACION || abs(anguloY) > UMBRAL_INCLINACION) {
+    if (abs(anguloX) > UMBRAL_INCLINACION || abs(anguloY) > UMBRAL_INCLINACION) { // compara con el umbral y actualiza inclinado
       inclinado = true;
     } else {
       inclinado = false;
@@ -78,7 +82,7 @@ void leerSerialBolsa() {
   }
 }
 
-int buzz_intermitente(int tono1, int tono2, int intervalo) {
+int buzz_intermitente(int tono1, int tono2, int intervalo) { // alterna entre dos tonos de buzzer
   static unsigned long tBuzzer = 0;
   static bool beepOn = false;
   if (millis() - tBuzzer >= intervalo) { 
@@ -89,31 +93,29 @@ int buzz_intermitente(int tono1, int tono2, int intervalo) {
 }
 
 void actualizarSalidas() {
-  bool rojo = false;                            
-  int tono = 0;                                
+  int tono = 0; // por default en silencio
 
   switch (estado) {
     case IDLE:
-      rojo = (vacia && vacioReconocido);        
+      if (vacia && vacioReconocido) setColor(true, false, true); // magenta 
+      else setColor(false, true, false); // verde
       break;
     case PRE_ALARMA:
-      rojo = true; 
-      tono = buzz_intermitente(500, 0, 400); 
+      setColor(true, true, false); // amarillo 
+      tono = buzz_intermitente(500, 0, 400);
       break;
     case ALARMA_CAIDO:
-      rojo = true;
+      setColor(true, false, false); // rojo
       tono = buzz_intermitente(700, 1000, 300);
       break;
     case ALARMA_VACIO:
-      rojo = true;
-      tono = buzz_intermitente(300, 100, 1000); 
+      setColor(true, false, true); // magenta 
+      tono = buzz_intermitente(300, 100, 1000);
       break;
   }
 
-  digitalWrite(PIN_ROJO, rojo ? HIGH : LOW);
-  digitalWrite(PIN_VERDE, rojo ? LOW : HIGH);
-
-  if (tono != tonoActual) {                     
+  // esta parte del buzzer queda igual que antes
+  if (tono != tonoActual) {
     if (tono == 0) noTone(PIN_BUZZER);
     else tone(PIN_BUZZER, tono);
     tonoActual = tono;
@@ -125,76 +127,75 @@ void cambiarEstado(Estado nuevo) {
   Serial.print(" -> ");
   Serial.println(NOMBRES[nuevo]);
   estado = nuevo;
-  tEstado = millis();                           // reinicia el cronómetro del estado
+  tEstado = millis();                           
 }
 
 void setup() {
-  pinMode(PIN_ROJO, OUTPUT);
+  pinMode(PIN_ROJO, OUTPUT);   
   pinMode(PIN_VERDE, OUTPUT);
+  pinMode(PIN_AZUL, OUTPUT);
   pinMode(PIN_BUZZER, OUTPUT);
   pinMode(PIN_BOTON, INPUT_PULLUP);
+  pinMode(PIN_EMISOR_IR, OUTPUT);
   
   Wire.begin();
-  Serial.begin(115200); // Una sola velocidad limpia y rápida
+  Serial.begin(115200); 
   
-  // Despertar el MPU-6050
-  Wire.beginTransmission(MPU_addr);
+  Wire.beginTransmission(MPU);
   Wire.write(0x6B); 
   Wire.write(0);    
   Wire.endTransmission(true);
 
-  Serial.println("Sistema iniciado. v=bolsa vacia, l=bolsa llena. Incline el MPU-6050.");
+  Serial.println("Sistema iniciado");
 }
 
 void loop() {
-  // Leemos el sensor físico de inclinación y el comando serial de la bolsa
   leerSensorInclinacion();
   leerSerialBolsa();
   
   bool boton = botonApretado();
 
-  // Si ya se enderezó, dejamos de ignorar la inclinación
   if (!inclinado) inclinadoIgnorado = false;
   bool hayInclinacion = inclinado && !inclinadoIgnorado;
 
   switch (estado) {
     case IDLE:
       if (hayInclinacion) {
-        cambiarEstado(PRE_ALARMA);              // la caída tiene prioridad
+        cambiarEstado(PRE_ALARMA);              
       } else if (vacia) {
         if (!vacioReconocido) {
-          cambiarEstado(ALARMA_VACIO);          // primera detección
+          cambiarEstado(ALARMA_VACIO);          
         } else if (millis() - tReconocido >= T_RECARGA) {
-          vacioReconocido = false;              // se acabó el tiempo de gracia
-          cambiarEstado(ALARMA_VACIO);          // y sigue vacía: suena de nuevo
+          vacioReconocido = false;             
+          cambiarEstado(ALARMA_VACIO);         
         }
       } else {
-        vacioReconocido = false;                // se recargó: todo normal
+        vacioReconocido = false;              
       }
       break;
 
     case PRE_ALARMA:
       if (boton) {
-        inclinadoIgnorado = true;               // cancelado a mano
+        inclinadoIgnorado = true;              
         cambiarEstado(IDLE);
       } else if (!inclinado) {
-        cambiarEstado(IDLE);                    // acomodado
+        cambiarEstado(IDLE);                   
       } else if (millis() - tEstado >= T_CAE) {
-        cambiarEstado(ALARMA_CAIDO);            // cae
+        cambiarEstado(ALARMA_CAIDO);           
       }
       break;
 
     case ALARMA_CAIDO:
       if (boton) {
-        inclinadoIgnorado = true;               // no re-alarmar hasta que se endereze
+        inclinadoIgnorado = true;               
         cambiarEstado(IDLE);
       }
       break;
 
     case ALARMA_VACIO:
       if (boton) {
-        vacioReconocido = true;                 // anota que ya se enteró
-        tReconocido = millis();                 // y cuándo
+        vacioReconocido = true;                 
+        tReconocido = millis();                 
         cambiarEstado(IDLE);
       } else if (hayInclinacion) {
         cambiarEstado(PRE_ALARMA);
@@ -202,6 +203,5 @@ void loop() {
       break;
   }
 
-  actualizarSalidas();                          // LED y buzzer según el estado
-  delay(50); // Pequeña pausa para estabilizar lecturas del loop
+  actualizarSalidas();                           
 }
