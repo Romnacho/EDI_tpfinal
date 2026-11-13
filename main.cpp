@@ -10,9 +10,14 @@ const int PIN_BOTON = 2;
 const int PIN_BUZZER = 4;
 const int MPU = 0x68; 
 
-const unsigned long T_CAE = 5000;       // ms inclinado antes de considerar que cayo
-const unsigned long T_RECARGA = 10000;  // ms para recargar la bolsa antes de alarma
-const float UMBRAL_INCLINACION = 30.0;  // grados de inclinación para considerarlo inclinado
+const int UMBRAL_ALTO = 150;                  // si el cambio supera esto, se detecta luz (bolsa vacia)
+const int UMBRAL_BAJO = 100;                  // si el cambio baja de esto, no hay luz (hay liquido)
+const unsigned long T_FILTRO_BOLSA = 1500;    // ms que debe sostenerse un cambio antes de aceptarlo
+const unsigned long T_MEDICION = 100;         // cada cuantos ms se mide el sensor IR
+const bool DEBUG_SENSOR = true;               // true = imprime las lecturas por Serial
+const unsigned long T_CAE = 5000;             // ms inclinado antes de considerar que cayo
+const unsigned long T_RECARGA = 10000;        // ms para recargar la bolsa antes de alarma
+const float UMBRAL_INCLINACION = 30.0;        // grados de inclinación para considerarlo inclinado
 
 enum Estado { IDLE, PRE_ALARMA, ALARMA_CAIDO, ALARMA_VACIO };
 Estado estado = IDLE;
@@ -28,6 +33,9 @@ bool botonLectura = HIGH;        // indica ultima lectura del pin del boton
 bool botonEstable = HIGH;        // indica estado del boton ya confirmado desp de 30 ms sin cambiar
 unsigned long tCambioBoton = 0;  // indica el tiempo del ultimo cambio de la lectura del boton
 int tonoActual = 0;              // indica el tono actual del buzzer
+bool modoSensor = true;          // true = 'vacia' la decide el sensor IR; false = modo manual por serial
+bool bolsaCambiando = false;     // true mientras una lectura distinta espera a pasar el filtro de tiempo
+unsigned long tCandidata = 0;    // tiempo en que empezo a sostenerse la lectura distinta
 
 bool botonApretado() { // antirrebote, solo acepta un cambio si la lectura se mantuvo estable más de 30 ms, y devuelve true únicamente en el flanco de bajada
   bool lectura = digitalRead(PIN_BOTON);
@@ -74,11 +82,55 @@ void leerSensorInclinacion() { // toma valores del MPU y actualiza la variable i
   }
 }
 
+void leerSensorBolsa() {
+  static unsigned long tUltimaMedicion = 0;   // cuando fue la ultima medicion
+  static unsigned long tUltimoDebug = 0;      // cuando fue el ultimo print de depuracion
+
+  if (!modoSensor) return;                                  // en modo manual no se usa el sensor
+  if (millis() - tUltimaMedicion < T_MEDICION) return;      // todavia no toca medir
+  tUltimaMedicion = millis();
+
+  digitalWrite(PIN_EMISOR, HIGH);                // prendo el emisor
+  delay(5);                                      // espero a que la lectura se estabilice
+  int conLuz = analogRead(PIN_RECEPTOR);         // lectura con emisor prendido
+  digitalWrite(PIN_EMISOR, LOW);                 // apago el emisor
+  delay(5);
+  int sinLuz = analogRead(PIN_RECEPTOR);         // lectura con emisor apagado (luz ambiente)
+
+  int cambio = abs(conLuz - sinLuz);             // cuanto cambia la lectura por culpa del emisor
+
+  // histeresis: dos umbrales distintos para no parpadear en el limite
+  bool candidata = vacia;                            // por defecto, el estado no cambia
+  if (cambio > UMBRAL_ALTO) candidata = true;        // pasa mucha luz -> bolsa vacia
+  else if (cambio < UMBRAL_BAJO) candidata = false;  // casi no pasa luz -> hay liquido
+
+  // filtro de tiempo: el cambio debe sostenerse T_FILTRO_BOLSA ms
+  if (candidata == vacia) {
+    bolsaCambiando = false;                      // no hay cambio pendiente
+  } else if (!bolsaCambiando) {
+    bolsaCambiando = true;                       // empieza a sostenerse un cambio
+    tCandidata = millis();
+  } else if (millis() - tCandidata >= T_FILTRO_BOLSA) {
+    vacia = candidata;                           // se sostuvo lo suficiente: lo aceptamos
+    bolsaCambiando = false;
+    Serial.println(vacia ? "sensor bolsa: VACIA" : "sensor bolsa: LLENA");
+  }
+
+  // depuracion: muestra los valores cada 500 ms para ajustar los umbrales
+  if (DEBUG_SENSOR && millis() - tUltimoDebug >= 500) {
+    tUltimoDebug = millis();
+    Serial.print("IR conLuz=");  Serial.print(conLuz);
+    Serial.print(" sinLuz=");    Serial.print(sinLuz);
+    Serial.print(" cambio=");    Serial.println(cambio);
+  }
+}
+
 void leerSerialBolsa() {
   while (Serial.available() > 0) {
     char t = Serial.read();
-    if (t == 'v') { vacia = true;      Serial.println("sensor bolsa: VACIA"); }
-    if (t == 'l') { vacia = false;     Serial.println("sensor bolsa: LLENA"); }
+    if (t == 'v') { modoSensor = false; vacia = true;  Serial.println("manual: VACIA"); }
+    if (t == 'l') { modoSensor = false; vacia = false; Serial.println("manual: LLENA"); }
+    if (t == 's') { modoSensor = true; bolsaCambiando = false; Serial.println("modo SENSOR activado"); }
   }
 }
 
@@ -137,6 +189,8 @@ void setup() {
   pinMode(PIN_BUZZER, OUTPUT);
   pinMode(PIN_BOTON, INPUT_PULLUP);
   pinMode(PIN_EMISOR_IR, OUTPUT);
+  pinMode(PIN_EMISOR, OUTPUT);       
+  digitalWrite(PIN_EMISOR, LOW);     
   
   Wire.begin();
   Serial.begin(115200); 
@@ -151,6 +205,7 @@ void setup() {
 
 void loop() {
   leerSensorInclinacion();
+  leerSensorBolsa(); 
   leerSerialBolsa();
   
   bool boton = botonApretado();
