@@ -45,43 +45,38 @@ void leerSensorInclinacion() { // toma valores del MPU y actualiza la variable i
 }
 
 void leerSensorBolsa() {
-  static unsigned long tUltimoDebug = 0;
-  if (!modoSensor) return;
+  static unsigned long tUltimoDebug = 0;       // ultimo print de depuracion
+  if (!modoSensor) return;                     // en modo manual no se usa el sensor
+  if (millis() - tUltimaMedicion < T_MEDICION) return;   // todavia no toca leer
+  tUltimaMedicion = millis();
 
-  if (IrReceiver.decode()) {
-    if (IrReceiver.decodedIRData.protocol == NEC &&
-        IrReceiver.decodedIRData.address == 0x00 &&
-        IrReceiver.decodedIRData.command == 0x45) {
-      tUltimaRecepcionIR = millis();
-    }
-    IrReceiver.resume();
-  }
+  int lectura = analogRead(PIN_RECEPTOR);      // 0 a 1023: valor alto = poca luz, bajo = mucha luz
+  if (valorFiltrado < 0) valorFiltrado = lectura;                       // primera lectura
+  else valorFiltrado = 0.8 * valorFiltrado + 0.2 * lectura;             // suavizado para que no salte
 
-  if (millis() - tUltimaEmisionIR >= T_MEDICION) {
-    tUltimaEmisionIR = millis();
-    IrSender.sendNEC(0x00, 0x45, 0);
-  }
+  // histeresis: dos umbrales distintos para no parpadear en el limite
+  bool candidata = vacia;                                     // por defecto no cambia
+  if (valorFiltrado > UMBRAL_POCA_LUZ) candidata = !VACIA_CON_MUCHA_LUZ;   // llega poca luz
+  else if (valorFiltrado < UMBRAL_MUCHA_LUZ) candidata = VACIA_CON_MUCHA_LUZ; // llega mucha luz
 
-  senalIR = (tUltimaRecepcionIR != 0 && millis() - tUltimaRecepcionIR < T_TIMEOUT_IR);
-  bool candidata = !senalIR;
-
+  // filtro de tiempo: el cambio debe sostenerse T_FILTRO_BOLSA ms
   if (candidata == vacia) {
-    bolsaCambiando = false;
+    bolsaCambiando = false;                    // no hay cambio pendiente
   } else if (!bolsaCambiando) {
-    bolsaCambiando = true;
+    bolsaCambiando = true;                     // empieza a sostenerse un cambio
     tCandidata = millis();
   } else if (millis() - tCandidata >= T_FILTRO_BOLSA) {
-    vacia = candidata;
+    vacia = candidata;                         // se sostuvo lo suficiente: lo aceptamos
     bolsaCambiando = false;
     Serial.println(vacia ? "sensor bolsa: VACIA" : "sensor bolsa: LLENA");
   }
 
+  // depuracion cada 500 ms
   if (DEBUG_SENSOR && millis() - tUltimoDebug >= 500) {
     tUltimoDebug = millis();
-    Serial.print("IR: ");
-    Serial.print(senalIR ? "RECIBIENDO" : "SIN SENAL");
-    Serial.print(" | Bolsa: ");
-    Serial.println(vacia ? "VACIA" : "LLENA");
+    Serial.print("lectura=");   Serial.print(lectura);
+    Serial.print(" filtrado="); Serial.print((int)valorFiltrado);
+    Serial.print(" | Bolsa: "); Serial.println(vacia ? "VACIA" : "LLENA");
   }
 }
 

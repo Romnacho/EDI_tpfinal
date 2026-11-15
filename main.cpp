@@ -7,15 +7,11 @@ void setup() {
   pinMode(PIN_BUZZER, OUTPUT);
   pinMode(PIN_BOTON, INPUT_PULLUP);
 
-  pinMode(PIN_EMISOR_IR, OUTPUT);
-  digitalWrite(PIN_EMISOR_IR, LOW);
+  pinMode(PIN_LED_BOLSA, OUTPUT);       // el LED emisor es una salida
+  digitalWrite(PIN_LED_BOLSA, HIGH);    // queda prendido todo el tiempo
 
   Wire.begin();
   Serial.begin(115200);
-
-  // Inicializar emisor y receptor infrarrojo
-  IrSender.begin(PIN_EMISOR_IR, DISABLE_LED_FEEDBACK);
-  IrReceiver.begin(PIN_RECEPTOR_IR, DISABLE_LED_FEEDBACK);
 
   // Inicializar MPU6050
   Wire.beginTransmission(MPU);
