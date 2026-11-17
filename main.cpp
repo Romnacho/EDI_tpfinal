@@ -19,14 +19,13 @@ void setup() {
   Wire.write(0x6B);
   Wire.write(0);
   Wire.endTransmission(true);
-  
+
   Serial.println("Sistema iniciado");
 }
 
 void loop() {
   leerSensorInclinacion(); // veo si el sistema esta inclinado
   leerSensorBolsa();       // veo si la bolsa esta vacia
-  leerSerialBolsa();       // FUNCION DE DEBUG; PONE EL ESTADO QUE LE INDIQUES POR SERIAL
   
   bool boton = botonApretado();
 
@@ -37,6 +36,9 @@ void loop() {
       if (hayInclinacion) {
         cambiarEstado(PRE_ALARMA);  // si esta inclinado voy a pre alarma            
       } 
+      if (inclinadoIgnorado && (millis() - tReconocido >= T_GRACIA)) {
+        inclinadoIgnorado = false; // si pasan T_GRACIA segundos y sigue inclinado inclinado ignorado vuelve a false
+        }
       else if (vacia) {
         if (!vacioReconocido) { 
           cambiarEstado(ALARMA_VACIO);  // si se detecta la bolsa vacia y no fue reconocido voy a alarma vacio        

@@ -18,11 +18,10 @@ const int MPU = 0x68;
 const int UMBRAL_LUZ = 780;                  // si el valor del fotoresistor supera esto, llega poca luz: bolsa llena            
 const bool VACIA_CON_MUCHA_LUZ = true;       // true; bolsa vacia, false; bolsa llena
 const unsigned long T_MEDICION = 50;         // ms entre lecturas del fotoresistor
-const unsigned long T_FILTRO_BOLSA = 1500;   // ms que debe sostenerse un valor antes de aceptarlo
 const unsigned long T_CAE = 5000;            // ms inclinado antes de considerar que cayo
 const unsigned long T_RECARGA = 10000;       // ms para recargar la bolsa antes de alarma
 const float UMBRAL_INCLINACION = 30.0;       // grados de inclinacion para considerarlo inclinado
-const bool DEBUG_RECEPTOR_BOLSA = true;      // DEBUG; BORRAR DESPUES
+const unsigned long T_GRACIA = 15000;       // ms de silencio antes de reactivar la alarma si sigue inclinado
 
 enum Estado { IDLE, PRE_ALARMA, ALARMA_CAIDO, ALARMA_VACIO };
 
@@ -40,9 +39,6 @@ extern bool botonEstable;
 extern unsigned long tCambioBoton;
 extern int tonoActual;
 extern bool modoSensor;
-extern bool bolsaCambiando;
-extern unsigned long tCandidata;
-extern float valorFiltrado;
 extern unsigned long tUltimaMedicion;
 
 // declaraciones de funciones 

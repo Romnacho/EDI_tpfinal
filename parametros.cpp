@@ -14,7 +14,4 @@ bool botonEstable = HIGH;           // indica estado del boton confirmado tras 3
 unsigned long tCambioBoton = 0;     // indica tiempo del ultimo cambio de la lectura del boton
 int tonoActual = 0;                 // indica tono actual del buzzer
 bool modoSensor = true;             // true = 'vacia' la decide el sensor; false = modo manual por serial DEBUG; BORRAR DESPUES???
-bool bolsaCambiando = false;        // true mientras una lectura distinta espera pasar el filtro
-unsigned long tCandidata = 0;       // tiempo en que empezo a sostenerse la lectura distinta
-float valorFiltrado = -1;           // lectura suavizada (-1 = todavia no hubo lectura)
 unsigned long tUltimaMedicion = 0;  // cuando fue la ultima lectura

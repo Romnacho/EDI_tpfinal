@@ -21,10 +21,20 @@ void setColor(bool r, bool g, bool b) {   // cambia el color del LED
 }
 
 void leerSensorInclinacion() { // lee los valores del MPU y actualiza la variable inclinado segun el umbral 
+  static unsigned long tUltimaInclinacion = 0;
+  if (millis() - tUltimaInclinacion < 50) 
+    return;
+  tUltimaInclinacion = millis();
+
   Wire.beginTransmission(MPU);
   Wire.write(0x3B);
-  Wire.endTransmission(false);
-  Wire.requestFrom(MPU, 6, true); // pide al sensor 6 bytes, 2 para x, 2 para y y 2 para z
+  if (Wire.endTransmission(false) != 0) {
+    return; 
+  }
+  
+  if (Wire.requestFrom(MPU, 6, true) != 6) {
+    return; 
+  }
 
   int16_t ax = (Wire.read() << 8) | Wire.read(); // lee el primer byte y lo desplaza 8 lugares hacia la izquierda
   int16_t ay = (Wire.read() << 8) | Wire.read();
@@ -57,15 +67,6 @@ void leerSensorBolsa() {
     vacia = false;
   else { // si la bolsa esta vacia
     vacia = true; 
-  }
-}
-
-void leerSerialBolsa() {  // FUNCION DE DEBUG; CAMBIA ESTADOS MEDIANTE SERIAL MONITOR
-  while (Serial.available() > 0) {
-    char t = Serial.read();
-    if (t == 'v') { modoSensor = false; vacia = true;  Serial.println("manual: VACIA"); }
-    if (t == 'l') { modoSensor = false; vacia = false; Serial.println("manual: LLENA"); }
-    if (t == 's') { modoSensor = true; bolsaCambiando = false; Serial.println("modo SENSOR activado"); }
   }
 }
 
