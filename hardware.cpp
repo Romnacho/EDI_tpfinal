@@ -31,7 +31,6 @@ void leerSensorInclinacion() { // lee los valores del MPU y actualiza la variabl
   if (Wire.endTransmission(false) != 0) {
     return; 
   }
-  
   if (Wire.requestFrom(MPU, 6, true) != 6) {
     return; 
   }
@@ -55,9 +54,7 @@ void leerSensorInclinacion() { // lee los valores del MPU y actualiza la variabl
   }                     
 }
 
-void leerSensorBolsa() {
-  if (!modoSensor) // DEBUG; en modo manual no se usa el sensor
-    return;                     
+void leerSensorBolsa() {                  
   if (millis() - tUltimaMedicion < T_MEDICION) // toma mediciones cada T_MEDICION
     return;   
   tUltimaMedicion = millis();

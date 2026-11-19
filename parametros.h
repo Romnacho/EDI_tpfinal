@@ -45,7 +45,6 @@ extern unsigned long tUltimaMedicion;
 bool botonApretado();                                   // antirrebote del boton
 void leerSensorInclinacion();                           // lee el MPU
 void leerSensorBolsa();                                 // lee el receptor de la bolsa
-void leerSerialBolsa();                                 // comandos de prueba por serial
 void setColor(bool r, bool g, bool b);                  // color del LED RGB
 int buzz_intermitente(int tono1, int tono2, int intervalo);
 void actualizarSalidas();                               // LED y buzzer segun el estado
