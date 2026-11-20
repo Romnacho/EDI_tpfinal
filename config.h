@@ -1,5 +1,5 @@
-#ifndef PARAMETROS_H        // evita que el archivo se incluya dos veces
-#define PARAMETROS_H
+#ifndef CONFIG_H        // evita que el archivo se incluya dos veces
+#define CONFIG_H
 
 #include <Wire.h>
 #include <Arduino.h>
@@ -24,7 +24,7 @@
 
 enum Estado { IDLE, PRE_ALARMA, ALARMA_CAIDO, ALARMA_VACIO };
 
-// declaraciones de variables, despues en "variables.cpp" se les da valor inicial y se explica que significan 
+// declaraciones de variables, despues en "config.cpp" se les da valor inicial y se explica que significan 
 extern Estado estado;
 extern unsigned long tEstado;
 extern bool inclinado;

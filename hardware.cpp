@@ -1,4 +1,4 @@
-#include "parametros.h"
+#include "hardware.h"
 
 bool botonApretado() {                       // antirrebote
   bool lectura = digitalRead(PIN_BOTON); 

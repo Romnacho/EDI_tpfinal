@@ -1,4 +1,4 @@
-#include "parametros.h"
+#include "software.h"
 
 void mde(bool boton, bool hayInclinacion) {
   int tono = 0; // por default en silencio

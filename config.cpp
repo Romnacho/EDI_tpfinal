@@ -1,4 +1,4 @@
-#include "parametros.h"     
+#include "config.h"     
 
 Estado estado = IDLE;
 
