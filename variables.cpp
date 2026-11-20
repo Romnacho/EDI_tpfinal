@@ -1,7 +1,6 @@
 #include "parametros.h"     
 
 Estado estado = IDLE;
-const char* NOMBRES[] = {"IDLE", "PRE_ALARMA", "ALARMA_CAIDO", "ALARMA_VACIO"};
 
 unsigned long tEstado = 0;          // indica tiempo en el estado actual
 bool inclinado = false;             // indica si el sistema esta inclinado o no
@@ -13,5 +12,4 @@ bool botonLectura = HIGH;           // indica ultima lectura del pin del boton
 bool botonEstable = HIGH;           // indica estado del boton confirmado tras 30 ms sin cambiar
 unsigned long tCambioBoton = 0;     // indica tiempo del ultimo cambio de la lectura del boton
 int tonoActual = 0;                 // indica tono actual del buzzer
-bool modoSensor = true;             // true = 'vacia' la decide el sensor; false = modo manual por serial DEBUG; BORRAR DESPUES???
 unsigned long tUltimaMedicion = 0;  // cuando fue la ultima lectura
