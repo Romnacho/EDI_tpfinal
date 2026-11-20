@@ -38,13 +38,4 @@ extern unsigned long tCambioBoton;
 extern int tonoActual;
 extern unsigned long tUltimaMedicion;
 
-// declaraciones de funciones 
-bool botonApretado();                                   // antirrebote del boton
-void leerSensorInclinacion();                           // lee el MPU
-void leerSensorBolsa();                                 // lee el receptor de la bolsa
-void setColor(bool r, bool g, bool b);                  // color del LED RGB
-int buzz_intermitente(int tono1, int tono2, int intervalo);
-void mde(bool boton, bool hayInclinacion);              // maquina de estados + salidas
-void cambiarEstado(Estado nuevo);                       // cambia de estado de la FSM
-
 #endif
